@@ -80,7 +80,7 @@ buf = Vector{Float64}(undef, length(my_data))
 
 for i in 1:length(my_data)
 	# Pass the buffer to avoid re-allocating memory every iteration
-	mask = sigma_clip!(my_data[i], buffer=buf)
+	mask = sigma_clip!(my_data[i], buf)
 	
 end
 ```
@@ -96,7 +96,7 @@ end
 | `std_reducer` | `std` | Function to calculate the dispersion. |
 | `mask` | `nothing` | Optional initial mask (`true` indicates a value to ignore). |
 | `bad` | `true` | The boolean value representing a "bad" datum in the input mask. |
-| `buffer` | `nothing` | A pre-allocated vector of size `length(x)` for internal calculations. |
+
 
 
 # License
