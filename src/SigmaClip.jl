@@ -2,13 +2,15 @@ module SigmaClip
 
 using Statistics
 
-export sigma_clip_mask, sigma_clip!, sigma_clip
+const BAD_PIXEL = true 
+
+export sigma_clip_mask, sigma_clip_mask!, sigma_clip!, sigma_clip
 
 """
     sigma_clip_mask(x::AbstractArray; kwargs...) -> BitArray
 
 Performs iterative sigma clipping on array `x` to identify outliers. 
-Returns a boolean mask (`BitArray`) where `true` indicates that the corresponding value is an outlier 
+Returns a boolean mask (`BitArray`) where `bad` (default true) indicates that the corresponding value is an outlier 
 (or was already masked in the input).
 
 The algorithm iteratively calculates central and dispersion statistics on a subset of "good" data, 
@@ -25,7 +27,7 @@ narrowing the bounds at each step until convergence or until `maxiter` is reache
 - `cent_reducer::Function`: Function to compute central tendency (default: `fast_median!`).
 - `std_reducer::Function`: Function to compute dispersion (default: `std`).
 - `maxiter::Int`: Maximum number of clipping iterations (default: 5).
-- `bad::Bool`: Boolean value indicating a "bad" datum in the input `mask` (default: `true`).
+
 
 # Example
 ```julia
@@ -34,46 +36,47 @@ data[50] = 100.0 # Artificial outlier
 mask = sigma_clip_mask(data, sigma_lower=3.0, sigma_upper=3.0)
 clean_data = data[.!mask]
 ```
-
 """
-function sigma_clip_mask(x::AbstractArray{T},
+sigma_clip_mask(x, args...; kwargs...) = begin 
+    
+    mask = trues(size(x))
+    
+    sigma_clip_mask!(x, mask, args...; kwargs...)
+end
+    
+
+function sigma_clip_mask!(x::AbstractArray{T, N},
+    mask::AbstractArray{Bool, N},
     buffer::B=nothing;
-    mask::Union{Nothing,AbstractArray{Bool}}=nothing,
     sigma_lower=3,
     sigma_upper=3,
     cent_reducer::F1=fast_median!,
     std_reducer::F2=std,
-    maxiter::Int=5,
-    bad::Bool=true) where {T,F1,F2,B}
+    maxiter::Int=5) where {T,F1,F2,B, N}
 
 
     if isnothing(buffer)
         buffer = Vector{T}(undef, length(x))
     end
 
-
-    lb, up = sigma_clip_bounds(x, mask, buffer, float(sigma_lower), float(sigma_upper), cent_reducer, std_reducer, maxiter, bad)
-
-
-    out_mask = falses(size(x))
-
-    have_mask = !isnothing(mask)
+    
+    lb, up = sigma_clip_bounds(x, mask, buffer, float(sigma_lower), float(sigma_upper), cent_reducer, std_reducer, maxiter)
 
     @inbounds for i in eachindex(x)
         val = x[i]
 
-        is_bad_input = have_mask && (mask[i] == bad)
+        is_bad_input = mask[i] == BAD_PIXEL
         is_outlier = !isfinite(val) || val < lb || val > up
 
         if is_bad_input || is_outlier
-            out_mask[i] = true
+            mask[i] = BAD_PIXEL
         end
     end
 
-    return out_mask
+    return mask
 end
 
-
+# TODO add support for units as extension via unitless
 """ 
 sigma_clip!(x::AbstractArray{<:AbstractFloat}; kwargs...) -> x
 
@@ -90,33 +93,31 @@ Arguments and Keywords
 
 Accepts the same arguments as sigma_clip.
 """
-function sigma_clip!(x::AbstractArray{T},
+function sigma_clip!(x::AbstractArray{T,N},
     buffer::B=nothing;
-    mask::Union{Nothing,AbstractArray{Bool}}=nothing,
+    mask::Union{Nothing,AbstractArray{Bool, N}}=nothing,
     sigma_lower=3,
     sigma_upper=3,
     cent_reducer::F1=fast_median!,
     std_reducer::F2=std,
-    maxiter::Int=5,
-    bad::Bool=true) where {T<:AbstractFloat,F1,F2,B} 
+    maxiter::Int=5) where {T<:AbstractFloat,F1,F2,B, N} 
 
     if isnothing(buffer)
         buffer = Vector{T}(undef, length(x))
     end
 
-
-    lb, up = sigma_clip_bounds(x, mask, buffer, float(sigma_lower), float(sigma_upper), cent_reducer, std_reducer, maxiter, bad)
+    use_mask = !isnothing(mask)
+    lb, up = sigma_clip_bounds(x, mask, buffer, float(sigma_lower), float(sigma_upper), cent_reducer, std_reducer, maxiter)
 
 
     @inbounds for i in eachindex(x)
         val = x[i]
 
-        if isnan(val)
-            continue
-        end
+        is_bad_input = use_mask && ( mask[i] == BAD_PIXEL)
+        is_outlier = !isfinite(val) || val < lb || val > up
 
 
-        if val < lb || val > up
+        if is_bad_input || is_outlier
             x[i] = T(NaN)
         end
     end
@@ -126,11 +127,23 @@ end
 
 
 
-sigma_clip(x, args...; kwargs...) = sigma_clip!(copy(x), args...; kwargs...)
+sigma_clip(x::AbstractArray{T}, args...; kwargs...) where {T <: AbstractFloat} = sigma_clip!(copy(x), args...; kwargs...)
+sigma_clip(x::AbstractArray{T}, args...; kwargs...) where {T <: Integer} = sigma_clip!(float.(x), args...; kwargs...)
 
 
+sigma_clip_bounds(x::AbstractArray{T}; 
+sigma_lower = 3,
+sigma_upper = 3,
+cent_reducer = fast_median!,
+std_reducer = std,
+maxiter = 5) where T = sigma_clip_bounds(x, nothing, Vector{T}(undef, length(x)),
+float(sigma_lower), 
+float(sigma_upper), 
+cent_reducer,
+std_reducer,
+maxiter)
 
-
+# TODO make this function return the buffer so we can compute mean, median and std ?
 function sigma_clip_bounds(
     x::AbstractArray{T},
     mask::Union{Nothing,AbstractArray{Bool}},
@@ -140,7 +153,6 @@ function sigma_clip_bounds(
     cent_reducer::F1,
     std_reducer::F2,
     maxiter::Int,
-    bad::Bool
 ) where {T,L,F1,F2}
 
     N = 0
@@ -148,7 +160,7 @@ function sigma_clip_bounds(
 
 
     @inbounds for i in eachindex(x)
-        is_valid = (!have_mask || mask[i] != bad) && isfinite(x[i])
+        is_valid = (!have_mask || mask[i] != BAD_PIXEL) && isfinite(x[i])
 
         if is_valid
             N += 1
@@ -245,9 +257,11 @@ end
 
 function fast_median!(a::AbstractVector{T}) where T
     n = length(a)
+
     if n == 0
         return T(0)
-    end # Gestione array vuoto
+    end 
+
     if iseven(n)
         m1 = _kth_smallest!(a, n ÷ 2)
         m2 = _kth_smallest!(a, (n ÷ 2) + 1)
