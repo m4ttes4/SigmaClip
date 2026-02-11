@@ -1,13 +1,9 @@
 # SigmaClip.jl
 
   
-
 > [!NOTE]
-
 > The algorithmic logic implemented in this module is inspired by the sigma_clip implementation found in the Astropy Python library.
-
   
-
 SigmaClip.jl provides a lightweight, highly efficient, and robust toolset for identifying and rejecting outliers in generic data arrays using iterative sigma clipping. It is designed to be numerically stable, handling NaN and Inf values gracefully while offering performance optimizations for high-throughput data processing.
 
   
