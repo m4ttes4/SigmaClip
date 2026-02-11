@@ -63,9 +63,9 @@ println("Cleaned size: $(length(clean_data))")
 
 Use sigma_clip! to modify the array directly. Identified outliers are overwritten with NaN. Requirement: 
 
-> [!WARNING] Title
+> [!WARNING]
+> **Data Types**
 > The input array must be of type AbstractFloat.
-
 ```Julia
 
 data = randn(100)
