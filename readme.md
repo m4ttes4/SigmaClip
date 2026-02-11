@@ -193,7 +193,7 @@ end
 
 | `mask` | `nothing` | Optional initial mask (`true` indicates a value to ignore). |
 
-| `bad` | `true` | The boolean value representing a "bad" datum in the input mask. |
+
 
   
   
