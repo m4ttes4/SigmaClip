@@ -13,22 +13,10 @@ SigmaClip.jl provides a lightweight, highly efficient, and robust toolset for id
 The algorithm works by calculating robust statistics (defaulting to the median and standard deviation) on the data. It rejects values that are more than a specified number of standard deviations from the center, re-calculates the statistics on the remaining data, and repeats the process until convergence or a maximum number of iterations is reached.
 
   
-
-#### Key Features
-
-- Iterative Refinement: Automatically tightens bounds over multiple passes.
-
-- Robustness: Explicitly handles and ignores non-finite values (NaN, Inf) during statistical calculation.
-
-- Dual Modes: Supports both non-destructive masking and in-place modification.
-
-- Memory Efficient: Supports pre-allocated buffers to minimize garbage collection overhead in hot loops.
-
   
 
 ## Usage
 
-  
 
 ## 1. Basic Clipping (Mask Generation)
 
