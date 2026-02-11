@@ -20,7 +20,7 @@ The algorithm works by calculating robust statistics (defaulting to the median a
 
 ## 1. Basic Clipping (Mask Generation)
 
-Use sigma_clip to identify outliers without altering the original dataset. This returns a BitArray mask.
+Use sigma_clip_mask to identify outliers without altering the original dataset. This returns a BitArray mask.
 
 ```Julia
 
@@ -120,7 +120,7 @@ end
 | `sigma_lower` | `3` | Tolerance (number of std devs) below the central value. |
 | `sigma_upper` | `3` | Tolerance (number of std devs) above the central value. |
 | `maxiter` | `5` | Maximum number of iterations. |
-| `cent_reducer` | `fast_median!` | Function to calculate the central tendency. |
+| `cent_reducer` | `fast_median!` | Function to calculate the central statistic. |
 | `std_reducer` | `std` | Function to calculate the dispersion. |
 | `mask` | `nothing` | Optional initial mask (`true` indicates a value to ignore). |
   
