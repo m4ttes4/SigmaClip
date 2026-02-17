@@ -1,5 +1,7 @@
 module SigmaClip
 
+# TODO mask only affects bounds
+# TODO make buffer args only 
 using Statistics
 
 const BAD_PIXEL = true 
@@ -28,6 +30,8 @@ narrowing the bounds at each step until convergence or until `maxiter` is reache
 - `std_reducer::Function`: Function to compute dispersion (default: `std`).
 - `maxiter::Int`: Maximum number of clipping iterations (default: 5).
 
+## NOTE: 
+mask is used only to mask some values when computing the bounds!
 
 # Example
 ```julia
@@ -39,20 +43,21 @@ clean_data = data[.!mask]
 """
 sigma_clip_mask(x, args...; kwargs...) = begin 
     
-    mask = trues(size(x))
+    target = trues(size(x))
     
-    sigma_clip_mask!(x, mask, args...; kwargs...)
+    sigma_clip_mask!(x, target, args...; kwargs...)
 end
     
 
 function sigma_clip_mask!(x::AbstractArray{T, N},
-    mask::AbstractArray{Bool, N},
+    target::AbstractArray{Bool},
     buffer::B=nothing;
+    mask::M = nothing,
     sigma_lower=3,
     sigma_upper=3,
     cent_reducer::F1=fast_median!,
     std_reducer::F2=std,
-    maxiter::Int=5) where {T,F1,F2,B, N}
+    maxiter::Int=5) where {T,F1,F2,B, M, N}
 
 
     if isnothing(buffer)
@@ -65,15 +70,14 @@ function sigma_clip_mask!(x::AbstractArray{T, N},
     @inbounds for i in eachindex(x)
         val = x[i]
 
-        is_bad_input = mask[i] == BAD_PIXEL
-        is_outlier = !isfinite(val) || val < lb || val > up
+        is_outlier = ismissing(val) || !isfinite(val) || val < lb || val > up
 
-        if is_bad_input || is_outlier
-            mask[i] = BAD_PIXEL
+        if is_outlier
+            target[i] = BAD_PIXEL
         end
     end
 
-    return mask
+    return target
 end
 
 # TODO add support for units as extension via unitless
@@ -106,18 +110,16 @@ function sigma_clip!(x::AbstractArray{T,N},
         buffer = Vector{T}(undef, length(x))
     end
 
-    use_mask = !isnothing(mask)
     lb, up = sigma_clip_bounds(x, mask, buffer, float(sigma_lower), float(sigma_upper), cent_reducer, std_reducer, maxiter)
 
 
     @inbounds for i in eachindex(x)
         val = x[i]
 
-        is_bad_input = use_mask && ( mask[i] == BAD_PIXEL)
-        is_outlier = !isfinite(val) || val < lb || val > up
+        is_outlier = ismissing(val) || !isfinite(val) || val < lb || val > up
 
 
-        if is_bad_input || is_outlier
+        if is_outlier
             x[i] = T(NaN)
         end
     end
@@ -146,7 +148,7 @@ std_reducer,
 maxiter)
 
 # TODO make this function return the buffer so we can compute mean, median and std ?
-# or just the buffer index
+
 function sigma_clip_bounds(
     x::AbstractArray{T},
     mask::Union{Nothing,AbstractArray{Bool}},
@@ -163,7 +165,7 @@ function sigma_clip_bounds(
 
 
     @inbounds for i in eachindex(x)
-        is_valid = (!have_mask || mask[i] != BAD_PIXEL) && isfinite(x[i])
+        is_valid = (!have_mask || mask[i] != BAD_PIXEL) && isfinite(x[i]) && !ismissing(x[i])
 
         if is_valid
             N += 1

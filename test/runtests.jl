@@ -30,8 +30,13 @@ using SigmaClip
 
         data = zeros(100)
         data[50] = 1000.0
+        mask = trues(size(data))
+        mask[50] = false
 
         # Eseguiamo il clip
+        sigma_clip!(data, mask = mask, sigma_lower=3, sigma_upper=3)
+        @test data[50] > 0
+
         sigma_clip!(data, sigma_lower=3, sigma_upper=3)
 
 
@@ -49,8 +54,12 @@ using SigmaClip
         original_data = zeros(Float64, 100)
         data = copy(original_data)
         data[50] = 1000.0
+        mask = trues(size(data))
+        mask[50] = false
 
         # Clip out-of-place
+        cleaned = sigma_clip(data, mask=mask, sigma_lower=2, sigma_upper=2)
+        @test cleaned[50] > 0
         cleaned = sigma_clip(data, sigma_lower=2, sigma_upper=2)
 
         # Verifica che l'originale non sia cambiato
@@ -75,11 +84,10 @@ using SigmaClip
         @test count(mask) >= 2 
 
 
-        # inv_mask = trues(length(data)) # Iniziamo con tutto buono
-        # sigma_clip_mask!(data, inv_mask, sigma_lower=3, sigma_upper=3, bad=false)
+        data = randn(100)
+        data[1] = 100.0 # Outlier 
+        data[2] = -100.0 # Outlier 
 
-        # @test inv_mask[1] == false 
-        # @test inv_mask[2] == false
     end
 
     @testset "Algorithmic Behavior & Params" begin
